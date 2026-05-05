@@ -1,0 +1,110 @@
+
+<mxfile host='app.diagrams.net'>
+  <diagram name='TTINT Polished'>
+    <mxGraphModel>
+      <root>
+        <mxCell id='0' />
+        <mxCell id='1' parent='0' />
+        <mxCell id='2' value='TTINT' style='rounded=1;whiteSpace=wrap;html=1;fillColor=#003366;strokeColor=#666666;' vertex='1' parent='1'>
+          <mxGeometry x='420' y='220' width='320' height='160' as='geometry' />
+        </mxCell>
+        <mxCell id='3' value='CBS Broker' style='rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;' vertex='1' parent='1'>
+          <mxGeometry x='80' y='100' width='180' height='70' as='geometry' />
+        </mxCell>
+        <mxCell id='4' value='Tibco ESB' style='rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;' vertex='1' parent='1'>
+          <mxGeometry x='80' y='220' width='180' height='70' as='geometry' />
+        </mxCell>
+        <mxCell id='5' value='MoaS Process - Import ES' style='rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;' vertex='1' parent='1'>
+          <mxGeometry x='80' y='340' width='180' height='70' as='geometry' />
+        </mxCell>
+        <mxCell id='6' value='Harmonised Grouping' style='rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;' vertex='1' parent='1'>
+          <mxGeometry x='80' y='460' width='180' height='70' as='geometry' />
+        </mxCell>
+        <mxCell id='7' value='Mapp' style='rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;' vertex='1' parent='1'>
+          <mxGeometry x='80' y='580' width='180' height='70' as='geometry' />
+        </mxCell>
+        <mxCell id='8' value='MoaS Process - Export ES' style='rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;' vertex='1' parent='1'>
+          <mxGeometry x='80' y='700' width='180' height='70' as='geometry' />
+        </mxCell>
+        <mxCell id='9' value='BIP' style='rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;' vertex='1' parent='1'>
+          <mxGeometry x='80' y='820' width='180' height='70' as='geometry' />
+        </mxCell>
+        <mxCell id='10' value='Rick Process' style='rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;' vertex='1' parent='1'>
+          <mxGeometry x='80' y='940' width='180' height='70' as='geometry' />
+        </mxCell>
+        <mxCell id='11' value='SCAP' style='rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;' vertex='1' parent='1'>
+          <mxGeometry x='80' y='1060' width='180' height='70' as='geometry' />
+        </mxCell>
+        <mxCell id='12' value='CHAMP' style='rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;' vertex='1' parent='1'>
+          <mxGeometry x='1050' y='80' width='180' height='70' as='geometry' />
+        </mxCell>
+        <mxCell id='13' value='FITON' style='rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;' vertex='1' parent='1'>
+          <mxGeometry x='1050' y='200' width='180' height='70' as='geometry' />
+        </mxCell>
+        <mxCell id='14' value='Rick Process' style='rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;' vertex='1' parent='1'>
+          <mxGeometry x='1050' y='320' width='180' height='70' as='geometry' />
+        </mxCell>
+        <mxCell id='15' value='MoaS Process - Export ES' style='rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;' vertex='1' parent='1'>
+          <mxGeometry x='1050' y='440' width='180' height='70' as='geometry' />
+        </mxCell>
+        <mxCell id='16' value='Tibco ESB' style='rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;' vertex='1' parent='1'>
+          <mxGeometry x='1050' y='560' width='180' height='70' as='geometry' />
+        </mxCell>
+        <mxCell id='17' value='CORe' style='rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;' vertex='1' parent='1'>
+          <mxGeometry x='1050' y='680' width='180' height='70' as='geometry' />
+        </mxCell>
+        <mxCell id='18' value='eCustoms' style='rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;' vertex='1' parent='1'>
+          <mxGeometry x='1050' y='800' width='180' height='70' as='geometry' />
+        </mxCell>
+        <mxCell id='19' value='Customer Order' edge='1' parent='1' source='3' target='2' style='endArrow=block; strokeWidth=2; edgeStyle=orthogonalEdgeStyle; exitX=1; exitY=0.2; entryX=0; entryY=0.5; labelBackgroundColor=#ffffff;'>
+          <mxGeometry relative='1' as='geometry' />
+        </mxCell>
+        <mxCell id='20' value='Customer Order' edge='1' parent='1' source='16' target='2' style='endArrow=block; strokeWidth=2; edgeStyle=orthogonalEdgeStyle; exitX=1; exitY=0.2750; entryX=0; entryY=0.5; labelBackgroundColor=#ffffff;'>
+          <mxGeometry relative='1' as='geometry' />
+        </mxCell>
+        <mxCell id='21' value='Declaration Task&amp;#xa;MoaS Event&amp;#xa;PN Task' edge='1' parent='1' source='5' target='2' style='endArrow=block; strokeWidth=2; edgeStyle=orthogonalEdgeStyle; exitX=1; exitY=0.350; entryX=0; entryY=0.5; labelBackgroundColor=#ffffff;'>
+          <mxGeometry relative='1' as='geometry' />
+        </mxCell>
+        <mxCell id='22' value='Harmonised Grouping' edge='1' parent='1' source='6' target='2' style='endArrow=block; strokeWidth=2; edgeStyle=orthogonalEdgeStyle; exitX=1; exitY=0.4250; entryX=0; entryY=0.5; labelBackgroundColor=#ffffff;'>
+          <mxGeometry relative='1' as='geometry' />
+        </mxCell>
+        <mxCell id='23' value='Harmonised Grouping' edge='1' parent='1' source='7' target='2' style='endArrow=block; strokeWidth=2; edgeStyle=orthogonalEdgeStyle; exitX=1; exitY=0.50; entryX=0; entryY=0.5; labelBackgroundColor=#ffffff;'>
+          <mxGeometry relative='1' as='geometry' />
+        </mxCell>
+        <mxCell id='24' value='MoaS Event&amp;#xa;Nesting Info' edge='1' parent='1' source='15' target='2' style='endArrow=block; strokeWidth=2; edgeStyle=orthogonalEdgeStyle; exitX=1; exitY=0.5750; entryX=0; entryY=0.5; labelBackgroundColor=#ffffff;'>
+          <mxGeometry relative='1' as='geometry' />
+        </mxCell>
+        <mxCell id='25' value='Pre-Notification (15AB)' edge='1' parent='1' source='9' target='2' style='endArrow=block; strokeWidth=2; edgeStyle=orthogonalEdgeStyle; exitX=1; exitY=0.650; entryX=0; entryY=0.5; labelBackgroundColor=#ffffff;'>
+          <mxGeometry relative='1' as='geometry' />
+        </mxCell>
+        <mxCell id='26' value='RICK Response&amp;#xa;TTINT Update' edge='1' parent='1' source='14' target='2' style='endArrow=block; strokeWidth=2; edgeStyle=orthogonalEdgeStyle; exitX=1; exitY=0.7250; entryX=0; entryY=0.5; labelBackgroundColor=#ffffff;'>
+          <mxGeometry relative='1' as='geometry' />
+        </mxCell>
+        <mxCell id='27' value='SCAP Event&amp;#xa;SCAP Grouping' edge='1' parent='1' source='11' target='2' style='endArrow=block; strokeWidth=2; edgeStyle=orthogonalEdgeStyle; exitX=1; exitY=0.8; entryX=0; entryY=0.5; labelBackgroundColor=#ffffff;'>
+          <mxGeometry relative='1' as='geometry' />
+        </mxCell>
+        <mxCell id='28' value='Air Waybill Consignment' edge='1' parent='1' source='2' target='12' style='endArrow=block; strokeWidth=2; edgeStyle=orthogonalEdgeStyle; exitX=1; exitY=0.15; entryX=0; entryY=0.5; labelBackgroundColor=#ffffff;'>
+          <mxGeometry relative='1' as='geometry' />
+        </mxCell>
+        <mxCell id='29' value='Bulk Declaration' edge='1' parent='1' source='2' target='13' style='endArrow=block; strokeWidth=2; edgeStyle=orthogonalEdgeStyle; exitX=1; exitY=0.26666666669; entryX=0; entryY=0.5; labelBackgroundColor=#ffffff;'>
+          <mxGeometry relative='1' as='geometry' />
+        </mxCell>
+        <mxCell id='30' value='Declaration Task&amp;#xa;PN Task' edge='1' parent='1' source='2' target='14' style='endArrow=block; strokeWidth=2; edgeStyle=orthogonalEdgeStyle; exitX=1; exitY=0.38333333331; entryX=0; entryY=0.5; labelBackgroundColor=#ffffff;'>
+          <mxGeometry relative='1' as='geometry' />
+        </mxCell>
+        <mxCell id='31' value='Ex Receptacle Pre-Announcement&amp;#xa;Mail Item' edge='1' parent='1' source='2' target='15' style='endArrow=block; strokeWidth=2; edgeStyle=orthogonalEdgeStyle; exitX=1; exitY=0.50; entryX=0; entryY=0.5; labelBackgroundColor=#ffffff;'>
+          <mxGeometry relative='1' as='geometry' />
+        </mxCell>
+        <mxCell id='32' value='Import Event&amp;#xa;SMO Pre-notification' edge='1' parent='1' source='2' target='16' style='endArrow=block; strokeWidth=2; edgeStyle=orthogonalEdgeStyle; exitX=1; exitY=0.61666666669; entryX=0; entryY=0.5; labelBackgroundColor=#ffffff;'>
+          <mxGeometry relative='1' as='geometry' />
+        </mxCell>
+        <mxCell id='33' value='RICK Response' edge='1' parent='1' source='2' target='17' style='endArrow=block; strokeWidth=2; edgeStyle=orthogonalEdgeStyle; exitX=1; exitY=0.73333333331; entryX=0; entryY=0.5; labelBackgroundColor=#ffffff;'>
+          <mxGeometry relative='1' as='geometry' />
+        </mxCell>
+        <mxCell id='34' value='SMO Pre-notification' edge='1' parent='1' source='2' target='18' style='endArrow=block; strokeWidth=2; edgeStyle=orthogonalEdgeStyle; exitX=1; exitY=0.85; entryX=0; entryY=0.5; labelBackgroundColor=#ffffff;'>
+          <mxGeometry relative='1' as='geometry' />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
