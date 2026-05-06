@@ -1,9 +1,9 @@
-name: Sync draw.io to Confluence (Attachment Mode)
+name: Sync draw.io to Confluence (Attachment Mode Final)
 
 on:
   push:
     paths:
-      - 'drawio.xml'
+      - 'drawio.drawio'
   workflow_dispatch:
 
 jobs:
@@ -19,26 +19,26 @@ jobs:
         uses: actions/checkout@v4
 
       # =========================================
-      # VALIDATE XML
+      # VALIDATE FILE
       # =========================================
-      - name: Validate XML
+      - name: Validate draw.io file
         run: |
-          if [ ! -f drawio.xml ]; then
-            echo "ERROR: drawio.xml not found"
+          if [ ! -f drawio.drawio ]; then
+            echo "ERROR: drawio.drawio not found"
             exit 1
           fi
 
-          if ! grep -q "<mxfile" drawio.xml; then
-            echo "ERROR: Invalid XML"
+          if ! grep -q "<mxfile" drawio.drawio; then
+            echo "ERROR: Invalid draw.io file"
             exit 1
           fi
 
       # =========================================
-      # GET VERSION
+      # FETCH PAGE INFO
       # =========================================
-      - name: Get Confluence page info
+      - name: Fetch Confluence metadata
         env:
-          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
+          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}   # zonder /wiki
           PAGE_ID: ${{ secrets.PAGE_ID }}
           USER: ${{ secrets.CONFLUENCE_USER }}
           TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
@@ -58,6 +58,34 @@ jobs:
           echo "TITLE=$TITLE" >> $GITHUB_ENV
 
       # =========================================
+      # DELETE EXISTING ATTACHMENT (OPTIONEEL MAAR AANRADER)
+      # =========================================
+      - name: Delete old attachment (if exists)
+        env:
+          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
+          PAGE_ID: ${{ secrets.PAGE_ID }}
+          USER: ${{ secrets.CONFLUENCE_USER }}
+          TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
+        run: |
+          AUTH=$(echo -n "$USER:$TOKEN" | base64 -w 0)
+
+          ATTACH_URL="$BASE_URL/wiki/rest/api/content/$PAGE_ID/child/attachment?filename=drawio.drawio"
+
+          curl -s -H "Authorization: Basic $AUTH" "$ATTACH_URL" > attachments.json
+
+          ATTACH_ID=$(jq -r '.results[0].id // empty' attachments.json)
+
+          if [ ! -z "$ATTACH_ID" ]; then
+            echo "Deleting old attachment: $ATTACH_ID"
+
+            curl -s -X DELETE \
+              -H "Authorization: Basic $AUTH" \
+              "$BASE_URL/wiki/rest/api/content/$ATTACH_ID"
+          else
+            echo "No existing attachment found"
+          fi
+
+      # =========================================
       # UPLOAD ATTACHMENT
       # =========================================
       - name: Upload draw.io attachment
@@ -71,12 +99,10 @@ jobs:
 
           URL="$BASE_URL/wiki/rest/api/content/$PAGE_ID/child/attachment"
 
-          echo "Uploading attachment..."
-
           curl -s -X POST "$URL" \
             -H "Authorization: Basic $AUTH" \
             -H "X-Atlassian-Token: nocheck" \
-            -F "file=@drawio.xml" \
+            -F "file=@drawio.drawio" \
             -F "minorEdit=true"
 
           echo "✅ Attachment uploaded"
@@ -95,11 +121,9 @@ jobs:
         run: |
           AUTH=$(echo -n "$USER:$TOKEN" | base64 -w 0)
 
-          echo "Building macro..."
-
-          MACRO="<ac:structured-macro ac:name=\"drawio\">\
-          MACRO="<ac:parameter ac:name=\"diagramName\">drawio.xml</ac:parameter>\
-          MACRO="</ac:structured-macro>"
+          MACRO='<ac:structured-macro ac:name="drawio">
+<ac:parameter ac:name="diagramName">drawio.drawio</ac:parameter>
+</ac:structured-macro>'
 
           jq -n \
             --arg id "$PAGE_ID" \
