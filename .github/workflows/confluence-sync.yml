@@ -1,0 +1,100 @@
+name: Sync draw.io to Confluence (Auto Version)
+
+on:
+  push:
+    paths:
+      - 'drawio.xml'
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ✅ 1. Repo ophalen
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # ✅ 2. XML ophalen
+      - name: Load XML
+        run: |
+          echo "Reading XML..."
+          cat drawio.xml > xml.txt
+
+      # ✅ 3. Huidige pagina ophalen + version bepalen
+      - name: Fetch Confluence page info
+        env:
+          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
+          PAGE_ID: ${{ secrets.PAGE_ID }}
+          USER: ${{ secrets.CONFLUENCE_USER }}
+          TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
+        run: |
+
+          echo "Fetching page data..."
+
+          RESPONSE=$(curl -s \
+            -H "Authorization: Basic $(echo -n "$USER:$TOKEN" | base64)" \
+            "$BASE_URL/rest/api/content/$PAGE_ID?expand=version,title")
+
+          echo "$RESPONSE" > page.json
+
+          export CURRENT_VERSION=$(jq '.version.number' page.json)
+          export TITLE=$(jq -r '.title' page.json)
+
+          NEXT_VERSION=$((CURRENT_VERSION + 1))
+
+          echo "Current version: $CURRENT_VERSION"
+          echo "Next version: $NEXT_VERSION"
+
+          echo "NEXT_VERSION=$NEXT_VERSION" >> $GITHUB_ENV
+          echo "TITLE=$TITLE" >> $GITHUB_ENV
+
+      # ✅ 4. Confluence update
+      - name: Update Confluence page
+        env:
+          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
+          PAGE_ID: ${{ secrets.PAGE_ID }}
+          USER: ${{ secrets.CONFLUENCE_USER }}
+          TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
+          NEXT_VERSION: ${{ env.NEXT_VERSION }}
+          TITLE: ${{ env.TITLE }}
+        run: |
+
+          XML_CONTENT=$(cat xml.txt)
+
+          echo "Updating page..."
+
+          BODY=$(cat <<EOF
+          {
+            "id": "$PAGE_ID",
+            "type": "page",
+            "title": "$TITLE",
+            "version": { "number": $NEXT_VERSION },
+            "body": {
+              "storage": {
+                "value": "<ac:structured-macro ac:name=\"drawio\"><ac:plain-text-body><![CDATA[$XML_CONTENT]]></ac:plain-text-body></ac:structured-macro>",
+                "representation": "storage"
+              }
+            }
+          }
+          EOF
+          )
+
+          curl -s -o response.json -w "%{http_code}" \
+            -X PUT "$BASE_URL/rest/api/content/$PAGE_ID" \
+            -H "Authorization: Basic $(echo -n "$USER:$TOKEN" | base64)" \
+            -H "Content-Type: application/json" \
+            -d "$BODY" > status.txt
+
+          STATUS=$(cat status.txt)
+
+          if [ "$STATUS" = "200" ]; then
+            echo "✅ SUCCESS: Page updated"
+          else
+            echo "❌ FAILED with status $STATUS"
+            cat response.json
+            exit 1
+          fi
