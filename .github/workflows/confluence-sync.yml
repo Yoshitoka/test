@@ -124,11 +124,13 @@ jobs:
         run: |
           AUTH=$(echo -n "$USER:$TOKEN" | base64 -w 0)
 
+          ATTACH_ID_NUM=$(echo $ATTACH_ID | sed 's/att//')
+
           # ✅ CRUCIALE macro (met custContentId)
           MACRO="<ac:structured-macro ac:name=\"drawio\" ac:schema-version=\"1\" data-layout=\"default\">"
           MACRO="<ac:parameter ac:name=\"pageId\">$PAGE_ID</ac:parameter>"
           MACRO="<ac:parameter ac:name=\"diagramName\">drawio.drawio</ac:parameter>"
-          MACRO="<ac:parameter ac:name=\"custContentId\">$FILE_ID</ac:parameter>"
+          MACRO="<ac:parameter ac:name=\"custContentId\">$ATTACH_ID_NUM</ac:parameter>"
           MACRO="<ac:parameter ac:name=\"contentVer\">1</ac:parameter>"
           MACRO="<ac:parameter ac:name=\"revision\">1</ac:parameter>"
           MACRO="<ac:parameter ac:name=\"width\">800</ac:parameter>"
