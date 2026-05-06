@@ -121,7 +121,7 @@ jobs:
         run: |
           AUTH=$(echo -n "$USER:$TOKEN" | base64 -w 0)
 
-          MACRO='<ac:structured-macro ac:name="drawio">'
+          MACRO='<ac:structured-macro ac:name="diagrams.net">'
           MACRO='<ac:parameter ac:name="diagramName">drawio.drawio</ac:parameter>'
           MACRO='</ac:structured-macro>'
 
