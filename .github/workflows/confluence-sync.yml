@@ -75,7 +75,7 @@ jobs:
           echo "Using PAGE_ID: $PAGE_ID"
 
           # ✅ BELANGRIJK: GEEN dubbele /wiki
-          URL="$BASE_URL/rest/api/content/$PAGE_ID?expand=version,title"
+          URL="$BASE_URL/wiki/rest/api/content/$PAGE_ID?expand=version,title"
 
           echo "Calling URL: $URL"
 
