@@ -1,4 +1,4 @@
-name: Sync draw.io to Confluence (Final Working)
+name: Sync draw.io to Confluence (Stable Final)
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -22,42 +22,22 @@ jobs:
         uses: actions/checkout@v4
 
       # =========================================
-      # DEBUG CONTEXT
-      # =========================================
-      - name: 🔍 Debug context
-        run: |
-          echo "::group::GitHub Context"
-          echo "Repo: $GITHUB_REPOSITORY"
-          echo "Branch: $GITHUB_REF"
-          echo "Actor: $GITHUB_ACTOR"
-          echo "::endgroup::"
-
-      # =========================================
       # VALIDATE XML
       # =========================================
       - name: 📥 Validate XML
         run: |
-          set -e
-          echo "::group::XML validation"
-
           if [ ! -f drawio.xml ]; then
             echo "::error::drawio.xml not found"
             exit 1
           fi
 
-          SIZE=$(wc -c < drawio.xml)
-          echo "File size: $SIZE"
-
           if ! grep -q "<mxfile" drawio.xml; then
-            echo "::error::Invalid XML (missing <mxfile>)"
+            echo "::error::Invalid XML"
             exit 1
           fi
 
-          echo "✅ XML is valid"
-          echo "::endgroup::"
-
       # =========================================
-      # FETCH CONFLUENCE PAGE
+      # FETCH PAGE
       # =========================================
       - name: 📄 Fetch Confluence metadata
         env:
@@ -66,19 +46,9 @@ jobs:
           USER: ${{ secrets.CONFLUENCE_USER }}
           TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
         run: |
-          set -e
-
-          echo "::group::Fetch Confluence page"
-
           AUTH=$(echo -n "$USER:$TOKEN" | base64 -w 0)
 
-          # ✅ BELANGRIJK:
-          # Als BASE_URL = https://xxx.atlassian.net/wiki
-          # gebruik /rest/api
           URL="$BASE_URL/wiki/rest/api/content/$PAGE_ID?expand=version,title"
-
-          echo "Calling URL:"
-          echo "$URL"
 
           HTTP_STATUS=$(curl -s -o page.json -w "%{http_code}" \
             -H "Authorization: Basic $AUTH" \
@@ -86,13 +56,10 @@ jobs:
             "$URL")
 
           echo "Status: $HTTP_STATUS"
-
-          echo "::group::Response"
           cat page.json
-          echo "::endgroup::"
 
           if [ "$HTTP_STATUS" != "200" ]; then
-            echo "::error::Failed to fetch page metadata"
+            echo "::error::Fetch failed"
             exit 1
           fi
 
@@ -104,10 +71,8 @@ jobs:
           echo "NEXT_VERSION=$NEXT_VERSION" >> $GITHUB_ENV
           echo "TITLE=$TITLE" >> $GITHUB_ENV
 
-          echo "::endgroup::"
-
       # =========================================
-      # UPDATE PAGE
+      # UPDATE PAGE (SAFE JSON via jq)
       # =========================================
       - name: 🚀 Update Confluence page
         env:
@@ -118,30 +83,41 @@ jobs:
           NEXT_VERSION: ${{ env.NEXT_VERSION }}
           TITLE: ${{ env.TITLE }}
         run: |
-          set -e
-
-          echo "::group::Update page"
-
           AUTH=$(echo -n "$USER:$TOKEN" | base64 -w 0)
 
-          # ✅ Escape XML veilig
-          XML_ESCAPED=$(sed 's/\r//g' drawio.xml | sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/"/\\"/g')
+          echo "Building macro..."
 
-          BODY=$(cat <<EOF
-          {
-            "id": "$PAGE_ID",
-            "type": "page",
-            "title": "$TITLE",
-            "version": { "number": $NEXT_VERSION },
-            "body": {
-              "storage": {
-              "value": "<ac:structured-macro ac:name=\"drawio\"><ac:parameter ac:name=\"diagramName\">Auto Diagram</ac:parameter><ac:plain-text-body><![CDATA[$XML_ESCAPED]]></ac:plain-text-body></ac:structured-macro>"
-                "representation": "storage"
+          XML=$(cat drawio.xml)
+
+          MACRO="<ac:structured-macro ac:name=\"drawio\">
+  <ac:parameter ac:name=\"diagramName\">Auto Diagram</ac:parameter>
+  <ac:parameter ac:name=\"contentType\">application/xml</ac:parameter>
+  <ac:plain-text-body><![CDATA[$XML]]></ac:plain-text-body>
+</ac:structured-macro>"
+
+          echo "Building JSON payload with jq..."
+
+          jq -n \
+            --arg id "$PAGE_ID" \
+            --arg title "$TITLE" \
+            --arg macro "$MACRO" \
+            --argjson version "$NEXT_VERSION" \
+            '{
+              id: $id,
+              type: "page",
+              title: $title,
+              version: { number: $version },
+              body: {
+                storage: {
+                  value: $macro,
+                  representation: "storage"
+                }
               }
-            }
-          }
-          EOF
-          )
+            }' > body.json
+
+          echo "::group::Payload preview"
+          cat body.json
+          echo "::endgroup::"
 
           URL="$BASE_URL/wiki/rest/api/content/$PAGE_ID"
 
@@ -149,7 +125,7 @@ jobs:
             -X PUT "$URL" \
             -H "Authorization: Basic $AUTH" \
             -H "Content-Type: application/json" \
-            -d "$BODY")
+            -d @body.json)
 
           echo "Status: $HTTP_STATUS"
 
@@ -163,10 +139,3 @@ jobs:
           fi
 
           echo "✅ Update successful"
-          echo "::endgroup::"
-
-      # =========================================
-      # DONE
-      # =========================================
-      - name: ✅ Done
-        run: echo "🎉 Done!"
