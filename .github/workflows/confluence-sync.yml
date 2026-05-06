@@ -102,7 +102,7 @@ jobs:
           curl -s -X POST "$URL" \
             -H "Authorization: Basic $AUTH" \
             -H "X-Atlassian-Token: nocheck" \
-            -F "file=@drawio.drawio;type=application/vnd.jgraph.mxfile
+            -F "file=@drawio.drawio;type=application/vnd.jgraph.mxfile"
             -F "minorEdit=true"
 
           echo "✅ Attachment uploaded"
