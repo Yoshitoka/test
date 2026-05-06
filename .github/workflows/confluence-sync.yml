@@ -1,4 +1,7 @@
-name: Sync draw.io to Confluence (Auto Version)
+name: Sync draw.io to Confluence (Full Logging)
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
   push:
@@ -14,26 +17,64 @@ jobs:
 
     steps:
 
-      # ✅ 1. Repo ophalen
-      - name: Checkout repo
+      # =========================================
+      # ✅ CHECKOUT
+      # =========================================
+      - name: 📦 Checkout repository
         uses: actions/checkout@v4
 
-      # ✅ 2. XML ophalen
-      - name: Load XML
+      # =========================================
+      # ✅ DEBUG CONTEXT
+      # =========================================
+      - name: 🔍 Debug context
         run: |
-          echo "Reading XML..."
-          cat drawio.xml > xml.txt
+          echo "::group::GitHub Context"
+          echo "Repo: $GITHUB_REPOSITORY"
+          echo "Branch: $GITHUB_REF"
+          echo "Actor: $GITHUB_ACTOR"
+          echo "Run ID: $GITHUB_RUN_ID"
+          echo "Commit: $GITHUB_SHA"
+          echo "::endgroup::"
 
-      # ✅ 3. Huidige pagina ophalen + version bepalen
-      - name: Fetch Confluence page info
+      # =========================================
+      # ✅ LOAD XML
+      # =========================================
+      - name: 📥 Load XML
+        run: |
+          echo "::group::Reading XML file"
+          
+          if [ ! -f drawio.xml ]; then
+            echo "::error::drawio.xml not found!"
+            exit 1
+          fi
+
+          FILE_SIZE=$(wc -c < drawio.xml)
+          echo "File size: $FILE_SIZE bytes"
+
+          if [ "$FILE_SIZE" -eq 0 ]; then
+            echo "::error::XML file is empty"
+            exit 1
+          fi
+
+          if ! grep -q "<mxfile" drawio.xml; then
+            echo "::error::Invalid XML (no <mxfile> tag)"
+            exit 1
+          fi
+
+          echo "✅ XML looks valid"
+          echo "::endgroup::"
+
+      # =========================================
+      # ✅ FETCH PAGE INFO
+      # =========================================
+      - name: 📄 Fetch Confluence page metadata
         env:
           BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
           PAGE_ID: ${{ secrets.PAGE_ID }}
           USER: ${{ secrets.CONFLUENCE_USER }}
           TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
         run: |
-
-          echo "Fetching page data..."
+          echo "::group::Fetching Confluence page"
 
           RESPONSE=$(curl -s \
             -H "Authorization: Basic $(echo -n "$USER:$TOKEN" | base64)" \
@@ -41,19 +82,35 @@ jobs:
 
           echo "$RESPONSE" > page.json
 
-          export CURRENT_VERSION=$(jq '.version.number' page.json)
-          export TITLE=$(jq -r '.title' page.json)
+          if [ -z "$RESPONSE" ]; then
+            echo "::error::Empty response from Confluence"
+            exit 1
+          fi
+
+          CURRENT_VERSION=$(jq '.version.number' page.json)
+          TITLE=$(jq -r '.title' page.json)
+
+          if [ "$CURRENT_VERSION" = "null" ]; then
+            echo "::error::Failed to parse version"
+            cat page.json
+            exit 1
+          fi
 
           NEXT_VERSION=$((CURRENT_VERSION + 1))
 
-          echo "Current version: $CURRENT_VERSION"
-          echo "Next version: $NEXT_VERSION"
+          echo "✅ Current version: $CURRENT_VERSION"
+          echo "✅ Next version: $NEXT_VERSION"
+          echo "✅ Page title: $TITLE"
 
           echo "NEXT_VERSION=$NEXT_VERSION" >> $GITHUB_ENV
           echo "TITLE=$TITLE" >> $GITHUB_ENV
 
-      # ✅ 4. Confluence update
-      - name: Update Confluence page
+          echo "::endgroup::"
+
+      # =========================================
+      # ✅ UPDATE PAGE
+      # =========================================
+      - name: 🚀 Update Confluence page
         env:
           BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
           PAGE_ID: ${{ secrets.PAGE_ID }}
@@ -62,10 +119,11 @@ jobs:
           NEXT_VERSION: ${{ env.NEXT_VERSION }}
           TITLE: ${{ env.TITLE }}
         run: |
+          echo "::group::Updating Confluence page"
 
-          XML_CONTENT=$(cat xml.txt)
+          XML_CONTENT=$(cat drawio.xml)
 
-          echo "Updating page..."
+          echo "Preparing payload..."
 
           BODY=$(cat <<EOF
           {
@@ -83,18 +141,30 @@ jobs:
           EOF
           )
 
-          curl -s -o response.json -w "%{http_code}" \
+          echo "Sending update to Confluence..."
+
+          HTTP_STATUS=$(curl -s -o response.json -w "%{http_code}" \
             -X PUT "$BASE_URL/rest/api/content/$PAGE_ID" \
             -H "Authorization: Basic $(echo -n "$USER:$TOKEN" | base64)" \
             -H "Content-Type: application/json" \
-            -d "$BODY" > status.txt
+            -d "$BODY")
 
-          STATUS=$(cat status.txt)
+          echo "HTTP Status: $HTTP_STATUS"
 
-          if [ "$STATUS" = "200" ]; then
-            echo "✅ SUCCESS: Page updated"
-          else
-            echo "❌ FAILED with status $STATUS"
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "::error::Update failed"
+            echo "::group::Response body"
             cat response.json
+            echo "::endgroup::"
             exit 1
           fi
+
+          echo "✅ SUCCESS: Confluence page updated"
+          echo "::endgroup::"
+
+      # =========================================
+      # ✅ FINAL SUCCESS
+      # =========================================
+      - name: ✅ Done
+        run: |
+          echo "🎉 Workflow completed successfully"
