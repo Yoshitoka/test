@@ -135,7 +135,7 @@ jobs:
             "version": { "number": $NEXT_VERSION },
             "body": {
               "storage": {
-                "value": "<ac:structured-macro ac:name=\"drawio\"><ac:plain-text-body><![CDATA[$XML_ESCAPED]]></ac:plain-text-body></ac:structured-macro>",
+              "value": "<ac:structured-macro ac:name=\"drawio\"><ac:parameter ac:name=\"diagramName\">Auto Diagram</ac:parameter><ac:plain-text-body><![CDATA[$XML_ESCAPED]]></ac:plain-text-body></ac:structured-macro>"
                 "representation": "storage"
               }
             }
