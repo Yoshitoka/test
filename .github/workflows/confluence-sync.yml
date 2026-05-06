@@ -168,4 +168,3 @@ jobs:
           fi
 
           echo "✅ Diagram succesvol gerenderd"
-``
