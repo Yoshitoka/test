@@ -125,7 +125,7 @@ jobs:
           AUTH=$(echo -n "$USER:$TOKEN" | base64 -w 0)
 
           # ✅ Escape XML veilig
-          XML_ESCAPED=$(sed ':a;N;$!ba;s/\n/\\n/g' drawio.xml | sed 's/"/\\"/g')
+          XML_ESCAPED=$(sed 's/\r//g' drawio.xml | sed ':a;N;$!ba;s/\n/\\n/g' | sed 's/"/\\"/g')
 
           BODY=$(cat <<EOF
           {
