@@ -1,8 +1,5 @@
 name: Sync draw.io to Confluence (Stable Final)
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 on:
   push:
     paths:
@@ -15,33 +12,27 @@ jobs:
 
     steps:
 
-      # =========================================
-      # CHECKOUT
-      # =========================================
-      - name: 📦 Checkout repo
+      # Checkout
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      # =========================================
-      # VALIDATE XML
-      # =========================================
-      - name: 📥 Validate XML
+      # Validate XML
+      - name: Validate XML
         run: |
           if [ ! -f drawio.xml ]; then
-            echo "::error::drawio.xml not found"
+            echo "ERROR: drawio.xml not found"
             exit 1
           fi
 
           if ! grep -q "<mxfile" drawio.xml; then
-            echo "::error::Invalid XML"
+            echo "ERROR: Invalid XML"
             exit 1
           fi
 
-      # =========================================
-      # FETCH PAGE
-      # =========================================
-      - name: 📄 Fetch Confluence metadata
+      # Fetch Confluence page
+      - name: Fetch Confluence metadata
         env:
-          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
+          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}   # ZONDER /wiki
           PAGE_ID: ${{ secrets.PAGE_ID }}
           USER: ${{ secrets.CONFLUENCE_USER }}
           TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
@@ -50,33 +41,29 @@ jobs:
 
           URL="$BASE_URL/wiki/rest/api/content/$PAGE_ID?expand=version,title"
 
-          HTTP_STATUS=$(curl -s -o page.json -w "%{http_code}" \
+          STATUS=$(curl -s -o page.json -w "%{http_code}" \
             -H "Authorization: Basic $AUTH" \
-            -H "Content-Type: application/json" \
             "$URL")
 
-          echo "Status: $HTTP_STATUS"
+          echo "HTTP: $STATUS"
           cat page.json
 
-          if [ "$HTTP_STATUS" != "200" ]; then
-            echo "::error::Fetch failed"
+          if [ "$STATUS" != "200" ]; then
+            echo "ERROR: Fetch failed"
             exit 1
           fi
 
           CURRENT_VERSION=$(jq '.version.number' page.json)
           TITLE=$(jq -r '.title' page.json)
-
           NEXT_VERSION=$((CURRENT_VERSION + 1))
 
           echo "NEXT_VERSION=$NEXT_VERSION" >> $GITHUB_ENV
           echo "TITLE=$TITLE" >> $GITHUB_ENV
 
-      # =========================================
-      # UPDATE PAGE (SAFE JSON via jq)
-      # =========================================
-      - name: 🚀 Update Confluence page
+      # Update Confluence page
+      - name: Update Confluence
         env:
-          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
+          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}   # ZONDER /wiki
           PAGE_ID: ${{ secrets.PAGE_ID }}
           USER: ${{ secrets.CONFLUENCE_USER }}
           TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
@@ -85,18 +72,22 @@ jobs:
         run: |
           AUTH=$(echo -n "$USER:$TOKEN" | base64 -w 0)
 
-          echo "Building macro..."
-
           XML=$(cat drawio.xml)
 
-          MACRO="<ac:structured-macro ac:name=\"drawio\">
-  <ac:parameter ac:name=\"diagramName\">Auto Diagram</ac:parameter>
-  <ac:parameter ac:name=\"contentType\">application/xml</ac:parameter>
-  <ac:plain-text-body><![CDATA[$XML]]></ac:plain-text-body>
-</ac:structured-macro>"
+          # ✅ BELANGRIJK: heredoc zonder YAML breken
+          MACRO=$(cat <<'EOF'
+<ac:structured-macro ac:name="drawio">
+  <ac:parameter ac:name="diagramName">Auto Diagram</ac:parameter>
+  <ac:parameter ac:name="contentType">application/xml</ac:parameter>
+  <ac:plain-text-body><![CDATA[
+EOF
+)
 
-          echo "Building JSON payload with jq..."
+          MACRO="${MACRO}${XML}"
 
+          MACRO="${MACRO}</ac:plain-text-body></ac:structured-macro>"
+
+          # JSON veilig opbouwen met jq
           jq -n \
             --arg id "$PAGE_ID" \
             --arg title "$TITLE" \
@@ -115,27 +106,20 @@ jobs:
               }
             }' > body.json
 
-          echo "::group::Payload preview"
-          cat body.json
-          echo "::endgroup::"
-
           URL="$BASE_URL/wiki/rest/api/content/$PAGE_ID"
 
-          HTTP_STATUS=$(curl -s -o response.json -w "%{http_code}" \
+          STATUS=$(curl -s -o response.json -w "%{http_code}" \
             -X PUT "$URL" \
             -H "Authorization: Basic $AUTH" \
             -H "Content-Type: application/json" \
             -d @body.json)
 
-          echo "Status: $HTTP_STATUS"
-
-          echo "::group::API RESPONSE"
+          echo "HTTP: $STATUS"
           cat response.json
-          echo "::endgroup::"
 
-          if [ "$HTTP_STATUS" != "200" ]; then
-            echo "::error::Update failed"
+          if [ "$STATUS" != "200" ]; then
+            echo "ERROR: Update failed"
             exit 1
           fi
 
-          echo "✅ Update successful"
+          echo "SUCCESS ✅"
