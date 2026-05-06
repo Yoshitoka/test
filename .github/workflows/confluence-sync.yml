@@ -121,9 +121,9 @@ jobs:
         run: |
           AUTH=$(echo -n "$USER:$TOKEN" | base64 -w 0)
 
-          MACRO='<ac:structured-macro ac:name="drawio">
-<ac:parameter ac:name="diagramName">drawio.drawio</ac:parameter>
-</ac:structured-macro>'
+          MACRO='<ac:structured-macro ac:name="drawio">'
+          MACRO='<ac:parameter ac:name="diagramName">drawio.drawio</ac:parameter>'
+          MACRO='</ac:structured-macro>'
 
           jq -n \
             --arg id "$PAGE_ID" \
