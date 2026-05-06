@@ -66,6 +66,7 @@ jobs:
           PAGE_ID: ${{ secrets.PAGE_ID }}
           USER: ${{ secrets.CONFLUENCE_USER }}
           TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
+          AUTH: ${{ secrets.AUTH }}
         run: |
           set -x
 
@@ -80,7 +81,7 @@ jobs:
           echo "Calling URL: $URL"
 
           HTTP_STATUS=$(curl -o page.json -w "%{http_code}" \
-            -H "Authorization: Basic $AUTH" \
+            -H "Authorization: Basic $(echo -n "$USER:$TOKEN" | base64 -w 0)" \
             -H "Content-Type: application/json" \
             "$URL")
 
