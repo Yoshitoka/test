@@ -1,4 +1,4 @@
-name: Sync draw.io to Confluence (Full Logging)
+name: Sync draw.io to Confluence (Full Debug + Versioning)
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -18,13 +18,13 @@ jobs:
     steps:
 
       # =========================================
-      # ✅ CHECKOUT
+      # CHECKOUT
       # =========================================
-      - name: 📦 Checkout repository
+      - name: 📦 Checkout repo
         uses: actions/checkout@v4
 
       # =========================================
-      # ✅ DEBUG CONTEXT
+      # CONTEXT DEBUG
       # =========================================
       - name: 🔍 Debug context
         run: |
@@ -37,44 +37,53 @@ jobs:
           echo "::endgroup::"
 
       # =========================================
-      # ✅ LOAD XML
+      # XML VALIDATION
       # =========================================
-      - name: 📥 Load XML
+      - name: 📥 Validate XML
         run: |
-          echo "::group::Reading XML file"
-          
+          set -x
+
+          echo "::group::XML Validation"
+
           if [ ! -f drawio.xml ]; then
-            echo "::error::drawio.xml not found!"
+            echo "::error::drawio.xml not found"
             exit 1
           fi
 
-          FILE_SIZE=$(wc -c < drawio.xml)
-          echo "File size: $FILE_SIZE bytes"
+          SIZE=$(wc -c < drawio.xml)
+          echo "File size: $SIZE bytes"
 
-          if [ "$FILE_SIZE" -eq 0 ]; then
-            echo "::error::XML file is empty"
+          if [ "$SIZE" -lt 50 ]; then
+            echo "::error::XML file too small"
             exit 1
           fi
 
           if ! grep -q "<mxfile" drawio.xml; then
-            echo "::error::Invalid XML (no <mxfile> tag)"
+            echo "::error::Invalid XML (missing <mxfile>)"
             exit 1
           fi
 
           echo "✅ XML looks valid"
+
+          echo "::group::Preview (first lines)"
+          head -20 drawio.xml
+          echo "::endgroup::"
+
           echo "::endgroup::"
 
       # =========================================
-      # ✅ FETCH PAGE INFO
+      # FETCH PAGE
       # =========================================
-      - name: 📄 Fetch Confluence page metadata
+      - name: 📄 Fetch Confluence metadata
         env:
           BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
           PAGE_ID: ${{ secrets.PAGE_ID }}
           USER: ${{ secrets.CONFLUENCE_USER }}
           TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
         run: |
-          echo "::group::Fetching Confluence page"
+          set -x
+
+          echo "::group::Fetching page"
 
           RESPONSE=$(curl -s \
             -H "Authorization: Basic $(echo -n "$USER:$TOKEN" | base64)" \
@@ -87,20 +96,23 @@ jobs:
             exit 1
           fi
 
+          echo "::group::Raw response"
+          cat page.json
+          echo "::endgroup::"
+
           CURRENT_VERSION=$(jq '.version.number' page.json)
           TITLE=$(jq -r '.title' page.json)
 
-          if [ "$CURRENT_VERSION" = "null" ]; then
-            echo "::error::Failed to parse version"
-            cat page.json
+          if [ "$CURRENT_VERSION" = "null" ] || [ -z "$TITLE" ]; then
+            echo "::error::Failed to parse page metadata"
             exit 1
           fi
 
           NEXT_VERSION=$((CURRENT_VERSION + 1))
 
-          echo "✅ Current version: $CURRENT_VERSION"
-          echo "✅ Next version: $NEXT_VERSION"
-          echo "✅ Page title: $TITLE"
+          echo "Current version: $CURRENT_VERSION"
+          echo "Next version: $NEXT_VERSION"
+          echo "Title: $TITLE"
 
           echo "NEXT_VERSION=$NEXT_VERSION" >> $GITHUB_ENV
           echo "TITLE=$TITLE" >> $GITHUB_ENV
@@ -108,9 +120,9 @@ jobs:
           echo "::endgroup::"
 
       # =========================================
-      # ✅ UPDATE PAGE
+      # UPDATE PAGE
       # =========================================
-      - name: 🚀 Update Confluence page
+      - name: 🚀 Update Confluence
         env:
           BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
           PAGE_ID: ${{ secrets.PAGE_ID }}
@@ -119,11 +131,12 @@ jobs:
           NEXT_VERSION: ${{ env.NEXT_VERSION }}
           TITLE: ${{ env.TITLE }}
         run: |
-          echo "::group::Updating Confluence page"
+          set -x
 
-          XML_CONTENT=$(cat drawio.xml)
+          echo "::group::Preparing payload"
 
-          echo "Preparing payload..."
+          # ✅ Escape XML for JSON
+          XML_ESCAPED=$(sed ':a;N;$!ba;s/\n/\\n/g' drawio.xml | sed 's/"/\\"/g')
 
           BODY=$(cat <<EOF
           {
@@ -133,7 +146,7 @@ jobs:
             "version": { "number": $NEXT_VERSION },
             "body": {
               "storage": {
-                "value": "<ac:structured-macro ac:name=\"drawio\"><ac:plain-text-body><![CDATA[$XML_CONTENT]]></ac:plain-text-body></ac:structured-macro>",
+                "value": "<ac:structured-macro ac:name=\"drawio\"><ac:plain-text-body><![CDATA[$XML_ESCAPED]]></ac:plain-text-body></ac:structured-macro>",
                 "representation": "storage"
               }
             }
@@ -141,7 +154,13 @@ jobs:
           EOF
           )
 
-          echo "Sending update to Confluence..."
+          echo "::group::Payload preview"
+          echo "$BODY" | head -50
+          echo "::endgroup::"
+
+          echo "::endgroup::"
+
+          echo "::group::Calling Confluence API"
 
           HTTP_STATUS=$(curl -s -o response.json -w "%{http_code}" \
             -X PUT "$BASE_URL/rest/api/content/$PAGE_ID" \
@@ -151,20 +170,23 @@ jobs:
 
           echo "HTTP Status: $HTTP_STATUS"
 
+          echo "::group::API RESPONSE"
+          cat response.json
+          echo "::endgroup::"
+
           if [ "$HTTP_STATUS" != "200" ]; then
-            echo "::error::Update failed"
-            echo "::group::Response body"
-            cat response.json
-            echo "::endgroup::"
+            echo "::error::Confluence update failed"
             exit 1
           fi
 
-          echo "✅ SUCCESS: Confluence page updated"
+          echo "✅ Update successful"
+
           echo "::endgroup::"
 
       # =========================================
-      # ✅ FINAL SUCCESS
+      # COMPLETE
       # =========================================
       - name: ✅ Done
         run: |
-          echo "🎉 Workflow completed successfully"
+          echo "🎉 Workflow finished successfully"
+``
