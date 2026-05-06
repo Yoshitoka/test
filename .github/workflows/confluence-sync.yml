@@ -1,4 +1,4 @@
-name: Sync draw.io to Confluence (Full Macro Version)
+name: Sync draw.io to Confluence (Final Working - custContentId)
 
 on:
   push:
@@ -38,7 +38,7 @@ jobs:
       # =========================================
       - name: Fetch page info
         env:
-          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
+          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}   # zonder /wiki
           PAGE_ID: ${{ secrets.PAGE_ID }}
           USER: ${{ secrets.CONFLUENCE_USER }}
           TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
@@ -71,11 +71,15 @@ jobs:
 
           URL="$BASE_URL/wiki/rest/api/content/$PAGE_ID/child/attachment"
 
+          echo "Uploading drawio.drawio..."
+
           curl -X POST "$URL" \
             -H "Authorization: Basic $AUTH" \
             -H "X-Atlassian-Token: nocheck" \
             -F 'file=@drawio.drawio;type=application/vnd.jgraph.mxfile' \
             -F 'minorEdit=true'
+
+          echo "✅ Upload complete"
 
       # =========================================
       # GET ATTACHMENT INFO
@@ -94,13 +98,21 @@ jobs:
           curl -s -H "Authorization: Basic $AUTH" "$URL" > attach.json
 
           ATTACH_ID=$(jq -r '.results[0].id' attach.json)
+          FILE_ID=$(jq -r '.results[0].extensions.fileId' attach.json)
+
+          if [ -z "$FILE_ID" ] || [ "$FILE_ID" = "null" ]; then
+            echo "ERROR: fileId (custContentId) not found"
+            cat attach.json
+            exit 1
+          fi
 
           echo "ATTACH_ID=$ATTACH_ID" >> $GITHUB_ENV
+          echo "FILE_ID=$FILE_ID" >> $GITHUB_ENV
 
       # =========================================
-      # UPDATE PAGE WITH FULL MACRO
+      # UPDATE PAGE WITH CORRECT MACRO
       # =========================================
-      - name: Update page
+      - name: Update Confluence page
         env:
           BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
           PAGE_ID: ${{ secrets.PAGE_ID }}
@@ -108,30 +120,23 @@ jobs:
           TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
           NEXT_VERSION: ${{ env.NEXT_VERSION }}
           TITLE: ${{ env.TITLE }}
-          ATTACH_ID: ${{ env.ATTACH_ID }}
+          FILE_ID: ${{ env.FILE_ID }}
         run: |
           AUTH=$(echo -n "$USER:$TOKEN" | base64 -w 0)
 
-          # ✅ Generate random IDs (zoals Confluence doet)
-          MACRO_ID=$(uuidgen)
-          LOCAL_ID=$(uuidgen)
-
-          MACRO="<ac:structured-macro ac:name=\"drawio\" ac:schema-version=\"1\" data-layout=\"default\" ac:local-id=\"$LOCAL_ID\" ac:macro-id=\"$MACRO_ID\">"
-          MACRO="<ac:parameter ac:name=\"mVer\">2</ac:parameter>"
-          MACRO="<ac:parameter ac:name=\"simple\">0</ac:parameter>"
-          MACRO="<ac:parameter ac:name=\"zoom\">1</ac:parameter>"
-          MACRO="<ac:parameter ac:name=\"inComment\">0</ac:parameter>"
+          # ✅ CRUCIALE macro (met custContentId)
+          MACRO="<ac:structured-macro ac:name=\"drawio\" ac:schema-version=\"1\" data-layout=\"default\">\
           MACRO="<ac:parameter ac:name=\"pageId\">$PAGE_ID</ac:parameter>"
-          MACRO="<ac:parameter ac:name=\"diagramDisplayName\">drawio.drawio</ac:parameter>"
-          MACRO="<ac:parameter ac:name=\"lbox\">1</ac:parameter>"
+          MACRO="<ac:parameter ac:name=\"diagramName\">drawio.drawio</ac:parameter>"
+          MACRO="<ac:parameter ac:name=\"custContentId\">$FILE_ID</ac:parameter>"
           MACRO="<ac:parameter ac:name=\"contentVer\">1</ac:parameter>"
           MACRO="<ac:parameter ac:name=\"revision\">1</ac:parameter>"
-          MACRO="<ac:parameter ac:name=\"baseUrl\">$BASE_URL/wiki</ac:parameter>"
-          MACRO="<ac:parameter ac:name=\"diagramName\">drawio.drawio</ac:parameter>"
-          MACRO="<ac:parameter ac:name=\"pCenter\">0</ac:parameter>"
           MACRO="<ac:parameter ac:name=\"width\">800</ac:parameter>"
           MACRO="<ac:parameter ac:name=\"height\">600</ac:parameter>"
           MACRO="</ac:structured-macro>"
+
+          echo "Macro preview:"
+          echo "$MACRO"
 
           jq -n \
             --arg id "$PAGE_ID" \
@@ -159,7 +164,7 @@ jobs:
             -H "Content-Type: application/json" \
             -d @body.json)
 
-          echo "HTTP status: $STATUS"
+          echo "HTTP Status: $STATUS"
           cat response.json
 
           if [ "$STATUS" != "200" ]; then
@@ -167,4 +172,4 @@ jobs:
             exit 1
           fi
 
-          echo "✅ Diagram succesvol gerenderd"
+          echo "✅ Diagram succesvol weergegeven in Confluence"
