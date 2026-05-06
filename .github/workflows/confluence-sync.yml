@@ -1,4 +1,4 @@
-name: Sync draw.io to Confluence (Full Debug + Versioning)
+name: Sync draw.io to Confluence (Fixed URL + Debug)
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -8,8 +8,6 @@ on:
     paths:
       - 'drawio.xml'
   workflow_dispatch:
-  schedule:
-    - cron: '0 6 * * *'
 
 jobs:
   sync:
@@ -24,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
 
       # =========================================
-      # CONTEXT DEBUG
+      # DEBUG CONTEXT
       # =========================================
       - name: 🔍 Debug context
         run: |
@@ -32,18 +30,15 @@ jobs:
           echo "Repo: $GITHUB_REPOSITORY"
           echo "Branch: $GITHUB_REF"
           echo "Actor: $GITHUB_ACTOR"
-          echo "Run ID: $GITHUB_RUN_ID"
-          echo "Commit: $GITHUB_SHA"
           echo "::endgroup::"
 
       # =========================================
-      # XML VALIDATION
+      # VALIDATE XML
       # =========================================
       - name: 📥 Validate XML
         run: |
           set -x
-
-          echo "::group::XML Validation"
+          echo "::group::XML validation"
 
           if [ ! -f drawio.xml ]; then
             echo "::error::drawio.xml not found"
@@ -51,28 +46,19 @@ jobs:
           fi
 
           SIZE=$(wc -c < drawio.xml)
-          echo "File size: $SIZE bytes"
-
-          if [ "$SIZE" -lt 50 ]; then
-            echo "::error::XML file too small"
-            exit 1
-          fi
+          echo "Size: $SIZE"
 
           if ! grep -q "<mxfile" drawio.xml; then
             echo "::error::Invalid XML (missing <mxfile>)"
             exit 1
           fi
 
-          echo "✅ XML looks valid"
-
-          echo "::group::Preview (first lines)"
           head -20 drawio.xml
-          echo "::endgroup::"
 
           echo "::endgroup::"
 
       # =========================================
-      # FETCH PAGE
+      # FETCH CONFLUENCE PAGE
       # =========================================
       - name: 📄 Fetch Confluence metadata
         env:
@@ -83,36 +69,39 @@ jobs:
         run: |
           set -x
 
-          echo "::group::Fetching page"
+          echo "::group::Fetch Confluence page"
 
-          RESPONSE=$(curl -s \
+          echo "Using BASE_URL: $BASE_URL"
+          echo "Using PAGE_ID: $PAGE_ID"
+
+          # ✅ BELANGRIJK: GEEN dubbele /wiki
+          URL="$BASE_URL/rest/api/content/$PAGE_ID?expand=version,title"
+
+          echo "Calling URL: $URL"
+
+          HTTP_STATUS=$(curl -o page.json -w "%{http_code}" \
             -H "Authorization: Basic $(echo -n "$USER:$TOKEN" | base64)" \
-            "$BASE_URL/wiki/rest/api/content/$PAGE_ID?expand=version,title")
+            -H "Content-Type: application/json" \
+            "$URL")
 
-          echo "$RESPONSE" > page.json
+          echo "Status: $HTTP_STATUS"
 
-          if [ -z "$RESPONSE" ]; then
-            echo "::error::Empty response from Confluence"
-            exit 1
-          fi
-
-          echo "::group::Raw response"
+          echo "::group::RAW RESPONSE"
           cat page.json
           echo "::endgroup::"
+
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "::error::Failed to fetch page metadata"
+            exit 1
+          fi
 
           CURRENT_VERSION=$(jq '.version.number' page.json)
           TITLE=$(jq -r '.title' page.json)
 
-          if [ "$CURRENT_VERSION" = "null" ] || [ -z "$TITLE" ]; then
-            echo "::error::Failed to parse page metadata"
-            exit 1
-          fi
+          echo "Current version: $CURRENT_VERSION"
+          echo "Title: $TITLE"
 
           NEXT_VERSION=$((CURRENT_VERSION + 1))
-
-          echo "Current version: $CURRENT_VERSION"
-          echo "Next version: $NEXT_VERSION"
-          echo "Title: $TITLE"
 
           echo "NEXT_VERSION=$NEXT_VERSION" >> $GITHUB_ENV
           echo "TITLE=$TITLE" >> $GITHUB_ENV
@@ -122,7 +111,7 @@ jobs:
       # =========================================
       # UPDATE PAGE
       # =========================================
-      - name: 🚀 Update Confluence
+      - name: 🚀 Update Confluence page
         env:
           BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
           PAGE_ID: ${{ secrets.PAGE_ID }}
@@ -133,9 +122,9 @@ jobs:
         run: |
           set -x
 
-          echo "::group::Preparing payload"
+          echo "::group::Prepare payload"
 
-          # ✅ Escape XML for JSON
+          # ✅ FIX: XML escapen
           XML_ESCAPED=$(sed ':a;N;$!ba;s/\n/\\n/g' drawio.xml | sed 's/"/\\"/g')
 
           BODY=$(cat <<EOF
@@ -155,27 +144,30 @@ jobs:
           )
 
           echo "::group::Payload preview"
-          echo "$BODY" | head -50
+          echo "$BODY" | head -40
           echo "::endgroup::"
 
           echo "::endgroup::"
 
-          echo "::group::Calling Confluence API"
+          # ✅ BELANGRIJK: correcte URL
+          URL="$BASE_URL/rest/api/content/$PAGE_ID"
+
+          echo "::group::Calling update API"
 
           HTTP_STATUS=$(curl -s -o response.json -w "%{http_code}" \
-            -X PUT "$BASE_URL/rest/api/content/$PAGE_ID" \
+            -X PUT "$URL" \
             -H "Authorization: Basic $(echo -n "$USER:$TOKEN" | base64)" \
             -H "Content-Type: application/json" \
             -d "$BODY")
 
-          echo "HTTP Status: $HTTP_STATUS"
+          echo "Status: $HTTP_STATUS"
 
           echo "::group::API RESPONSE"
           cat response.json
           echo "::endgroup::"
 
           if [ "$HTTP_STATUS" != "200" ]; then
-            echo "::error::Confluence update failed"
+            echo "::error::Update failed"
             exit 1
           fi
 
@@ -184,8 +176,7 @@ jobs:
           echo "::endgroup::"
 
       # =========================================
-      # COMPLETE
+      # DONE
       # =========================================
       - name: ✅ Done
-        run: |
-          echo "🎉 Workflow finished successfully"
+        run: echo "🎉 Completed successfully"
