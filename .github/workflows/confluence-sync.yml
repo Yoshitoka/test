@@ -1,4 +1,4 @@
-name: Sync draw.io to Confluence (Fixed URL + Debug)
+name: Sync draw.io to Confluence (Final Working)
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -37,7 +37,7 @@ jobs:
       # =========================================
       - name: 📥 Validate XML
         run: |
-          set -x
+          set -e
           echo "::group::XML validation"
 
           if [ ! -f drawio.xml ]; then
@@ -46,15 +46,14 @@ jobs:
           fi
 
           SIZE=$(wc -c < drawio.xml)
-          echo "Size: $SIZE"
+          echo "File size: $SIZE"
 
           if ! grep -q "<mxfile" drawio.xml; then
             echo "::error::Invalid XML (missing <mxfile>)"
             exit 1
           fi
 
-          head -20 drawio.xml
-
+          echo "✅ XML is valid"
           echo "::endgroup::"
 
       # =========================================
@@ -66,28 +65,29 @@ jobs:
           PAGE_ID: ${{ secrets.PAGE_ID }}
           USER: ${{ secrets.CONFLUENCE_USER }}
           TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
-          AUTH: ${{ secrets.AUTH }}
         run: |
-          set -x
+          set -e
 
           echo "::group::Fetch Confluence page"
 
-          echo "Using BASE_URL: $BASE_URL"
-          echo "Using PAGE_ID: $PAGE_ID"
+          AUTH=$(echo -n "$USER:$TOKEN" | base64 -w 0)
 
-          # ✅ BELANGRIJK: GEEN dubbele /wiki
+          # ✅ BELANGRIJK:
+          # Als BASE_URL = https://xxx.atlassian.net/wiki
+          # gebruik /rest/api
           URL="$BASE_URL/wiki/rest/api/content/$PAGE_ID?expand=version,title"
 
-          echo "Calling URL: $URL"
+          echo "Calling URL:"
+          echo "$URL"
 
-          HTTP_STATUS=$(curl -o page.json -w "%{http_code}" \
-            -H "Authorization: Basic $(echo -n "$USER:$TOKEN" | base64 -w 0)" \
+          HTTP_STATUS=$(curl -s -o page.json -w "%{http_code}" \
+            -H "Authorization: Basic $AUTH" \
             -H "Content-Type: application/json" \
             "$URL")
 
           echo "Status: $HTTP_STATUS"
 
-          echo "::group::RAW RESPONSE"
+          echo "::group::Response"
           cat page.json
           echo "::endgroup::"
 
@@ -98,9 +98,6 @@ jobs:
 
           CURRENT_VERSION=$(jq '.version.number' page.json)
           TITLE=$(jq -r '.title' page.json)
-
-          echo "Current version: $CURRENT_VERSION"
-          echo "Title: $TITLE"
 
           NEXT_VERSION=$((CURRENT_VERSION + 1))
 
@@ -121,11 +118,13 @@ jobs:
           NEXT_VERSION: ${{ env.NEXT_VERSION }}
           TITLE: ${{ env.TITLE }}
         run: |
-          set -x
+          set -e
 
-          echo "::group::Prepare payload"
+          echo "::group::Update page"
 
-          # ✅ FIX: XML escapen
+          AUTH=$(echo -n "$USER:$TOKEN" | base64 -w 0)
+
+          # ✅ Escape XML veilig
           XML_ESCAPED=$(sed ':a;N;$!ba;s/\n/\\n/g' drawio.xml | sed 's/"/\\"/g')
 
           BODY=$(cat <<EOF
@@ -144,20 +143,11 @@ jobs:
           EOF
           )
 
-          echo "::group::Payload preview"
-          echo "$BODY" | head -40
-          echo "::endgroup::"
-
-          echo "::endgroup::"
-
-          # ✅ BELANGRIJK: correcte URL
-          URL="$BASE_URL/rest/api/content/$PAGE_ID"
-
-          echo "::group::Calling update API"
+          URL="$BASE_URL/wiki/rest/api/content/$PAGE_ID"
 
           HTTP_STATUS=$(curl -s -o response.json -w "%{http_code}" \
             -X PUT "$URL" \
-            -H "Authorization: Basic $(echo -n "$USER:$TOKEN" | base64)" \
+            -H "Authorization: Basic $AUTH" \
             -H "Content-Type: application/json" \
             -d "$BODY")
 
@@ -173,11 +163,10 @@ jobs:
           fi
 
           echo "✅ Update successful"
-
           echo "::endgroup::"
 
       # =========================================
       # DONE
       # =========================================
       - name: ✅ Done
-        run: echo "🎉 Completed successfully"
+        run: echo "🎉 Done!"
