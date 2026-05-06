@@ -1,4 +1,4 @@
-name: Sync draw.io to Confluence (Final Fixed)
+name: Sync draw.io to Confluence (Attachment Mode)
 
 on:
   push:
@@ -12,11 +12,15 @@ jobs:
 
     steps:
 
-      # Checkout
-      - name: Checkout repo
+      # =========================================
+      # CHECKOUT
+      # =========================================
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Validate XML
+      # =========================================
+      # VALIDATE XML
+      # =========================================
       - name: Validate XML
         run: |
           if [ ! -f drawio.xml ]; then
@@ -29,10 +33,12 @@ jobs:
             exit 1
           fi
 
-      # Fetch Confluence page
-      - name: Fetch Confluence metadata
+      # =========================================
+      # GET VERSION
+      # =========================================
+      - name: Get Confluence page info
         env:
-          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}   # zonder /wiki
+          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
           PAGE_ID: ${{ secrets.PAGE_ID }}
           USER: ${{ secrets.CONFLUENCE_USER }}
           TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
@@ -41,29 +47,46 @@ jobs:
 
           URL="$BASE_URL/wiki/rest/api/content/$PAGE_ID?expand=version,title"
 
-          STATUS=$(curl -s -o page.json -w "%{http_code}" \
-            -H "Authorization: Basic $AUTH" \
-            "$URL")
-
-          echo "HTTP: $STATUS"
-          cat page.json
-
-          if [ "$STATUS" != "200" ]; then
-            echo "ERROR: Fetch failed"
-            exit 1
-          fi
+          curl -s -H "Authorization: Basic $AUTH" "$URL" > page.json
 
           CURRENT_VERSION=$(jq '.version.number' page.json)
           TITLE=$(jq -r '.title' page.json)
+
           NEXT_VERSION=$((CURRENT_VERSION + 1))
 
           echo "NEXT_VERSION=$NEXT_VERSION" >> $GITHUB_ENV
           echo "TITLE=$TITLE" >> $GITHUB_ENV
 
-      # Update Confluence
-      - name: Update Confluence
+      # =========================================
+      # UPLOAD ATTACHMENT
+      # =========================================
+      - name: Upload draw.io attachment
         env:
-          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}   # zonder /wiki
+          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
+          PAGE_ID: ${{ secrets.PAGE_ID }}
+          USER: ${{ secrets.CONFLUENCE_USER }}
+          TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
+        run: |
+          AUTH=$(echo -n "$USER:$TOKEN" | base64 -w 0)
+
+          URL="$BASE_URL/wiki/rest/api/content/$PAGE_ID/child/attachment"
+
+          echo "Uploading attachment..."
+
+          curl -s -X POST "$URL" \
+            -H "Authorization: Basic $AUTH" \
+            -H "X-Atlassian-Token: nocheck" \
+            -F "file=@drawio.xml" \
+            -F "minorEdit=true"
+
+          echo "✅ Attachment uploaded"
+
+      # =========================================
+      # UPDATE PAGE WITH DRAW.IO MACRO
+      # =========================================
+      - name: Update page with draw.io macro
+        env:
+          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
           PAGE_ID: ${{ secrets.PAGE_ID }}
           USER: ${{ secrets.CONFLUENCE_USER }}
           TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
@@ -72,16 +95,12 @@ jobs:
         run: |
           AUTH=$(echo -n "$USER:$TOKEN" | base64 -w 0)
 
-          XML=$(cat drawio.xml)
+          echo "Building macro..."
 
-          # ✅ Build macro veilig (geen heredoc)
-          MACRO="<ac:structured-macro ac:name=\"drawio\">"
-          MACRO="${MACRO}<ac:parameter ac:name=\"diagramName\">Auto Diagram</ac:parameter>"
-          MACRO="${MACRO}<ac:parameter ac:name=\"contentType\">application/xml</ac:parameter>"
-          MACRO="${MACRO}<ac:plain-text-body><![CDATA[${XML}]]></ac:plain-text-body>"
-          MACRO="${MACRO}</ac:structured-macro>"
+          MACRO="<ac:structured-macro ac:name=\"drawio\">\
+          MACRO="<ac:parameter ac:name=\"diagramName\">drawio.xml</ac:parameter>\
+          MACRO="</ac:structured-macro>"
 
-          # ✅ JSON via jq (no parse errors)
           jq -n \
             --arg id "$PAGE_ID" \
             --arg title "$TITLE" \
@@ -112,8 +131,8 @@ jobs:
           cat response.json
 
           if [ "$STATUS" != "200" ]; then
-            echo "ERROR: Update failed"
+            echo "ERROR: Page update failed"
             exit 1
           fi
 
-          echo "SUCCESS ✅"
+          echo "✅ Page updated with draw.io macro"
