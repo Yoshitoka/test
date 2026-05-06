@@ -1,4 +1,4 @@
-name: Sync draw.io to Confluence (Attachment Mode Final)
+name: Sync draw.io to Confluence (Attachment Final Working)
 
 on:
   push:
@@ -36,7 +36,7 @@ jobs:
       # =========================================
       # FETCH PAGE INFO
       # =========================================
-      - name: Fetch Confluence metadata
+      - name: Fetch page info
         env:
           BASE_URL: ${{ secrets.CONFLUENCE_BASE }}   # zonder /wiki
           PAGE_ID: ${{ secrets.PAGE_ID }}
@@ -58,34 +58,6 @@ jobs:
           echo "TITLE=$TITLE" >> $GITHUB_ENV
 
       # =========================================
-      # DELETE EXISTING ATTACHMENT (OPTIONEEL MAAR AANRADER)
-      # =========================================
-      - name: Delete old attachment (if exists)
-        env:
-          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
-          PAGE_ID: ${{ secrets.PAGE_ID }}
-          USER: ${{ secrets.CONFLUENCE_USER }}
-          TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
-        run: |
-          AUTH=$(echo -n "$USER:$TOKEN" | base64 -w 0)
-
-          ATTACH_URL="$BASE_URL/wiki/rest/api/content/$PAGE_ID/child/attachment?filename=drawio.drawio"
-
-          curl -s -H "Authorization: Basic $AUTH" "$ATTACH_URL" > attachments.json
-
-          ATTACH_ID=$(jq -r '.results[0].id // empty' attachments.json)
-
-          if [ ! -z "$ATTACH_ID" ]; then
-            echo "Deleting old attachment: $ATTACH_ID"
-
-            curl -s -X DELETE \
-              -H "Authorization: Basic $AUTH" \
-              "$BASE_URL/wiki/rest/api/content/$ATTACH_ID"
-          else
-            echo "No existing attachment found"
-          fi
-
-      # =========================================
       # UPLOAD ATTACHMENT
       # =========================================
       - name: Upload draw.io attachment
@@ -99,18 +71,48 @@ jobs:
 
           URL="$BASE_URL/wiki/rest/api/content/$PAGE_ID/child/attachment"
 
-          curl -s -X POST "$URL" \
+          echo "Uploading drawio.drawio..."
+
+          curl -X POST "$URL" \
             -H "Authorization: Basic $AUTH" \
             -H "X-Atlassian-Token: nocheck" \
-            -F "file=@drawio.drawio;type=application/vnd.jgraph.mxfile" \
-            -F "minorEdit=true" \
+            -F 'file=@drawio.drawio;type=application/vnd.jgraph.mxfile' \
+            -F 'minorEdit=true'
 
-          echo "✅ Attachment uploaded"
+          echo "✅ Upload complete"
+
+      # =========================================
+      # GET ATTACHMENT ID
+      # =========================================
+      - name: Get attachment ID
+        env:
+          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
+          PAGE_ID: ${{ secrets.PAGE_ID }}
+          USER: ${{ secrets.CONFLUENCE_USER }}
+          TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
+        run: |
+          AUTH=$(echo -n "$USER:$TOKEN" | base64 -w 0)
+
+          URL="$BASE_URL/wiki/rest/api/content/$PAGE_ID/child/attachment?filename=drawio.drawio"
+
+          curl -s -H "Authorization: Basic $AUTH" "$URL" > attach.json
+
+          ATTACH_ID=$(jq -r '.results[0].id' attach.json)
+
+          if [ -z "$ATTACH_ID" ] || [ "$ATTACH_ID" = "null" ]; then
+            echo "ERROR: failed to get attachment ID"
+            cat attach.json
+            exit 1
+          fi
+
+          echo "Attachment ID: $ATTACH_ID"
+
+          echo "ATTACH_ID=$ATTACH_ID" >> $GITHUB_ENV
 
       # =========================================
       # UPDATE PAGE WITH DRAW.IO MACRO
       # =========================================
-      - name: Update page with draw.io macro
+      - name: Update page with diagram
         env:
           BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
           PAGE_ID: ${{ secrets.PAGE_ID }}
@@ -118,13 +120,17 @@ jobs:
           TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
           NEXT_VERSION: ${{ env.NEXT_VERSION }}
           TITLE: ${{ env.TITLE }}
+          ATTACH_ID: ${{ env.ATTACH_ID }}
         run: |
           AUTH=$(echo -n "$USER:$TOKEN" | base64 -w 0)
 
-          MACRO='<ac:structured-macro ac:name="diagrams.net">'
-          MACRO='<ac:parameter ac:name="diagramName">drawio.drawio</ac:parameter>'
-          MACRO='</ac:structured-macro>'
+          # ✅ CORRECTE diagrams.net macro
+          MACRO="<ac:structured-macro ac:name=\"diagrams.net\">"
+          MACRO="<ac:parameter ac:name=\"diagramName\">drawio.drawio</ac:parameter>"
+          MACRO="<ac:parameter ac:name=\"attachmentId\">$ATTACH_ID</ac:parameter>"
+          MACRO="</ac:structured-macro>"
 
+          # ✅ JSON veilig bouwen
           jq -n \
             --arg id "$PAGE_ID" \
             --arg title "$TITLE" \
@@ -151,12 +157,12 @@ jobs:
             -H "Content-Type: application/json" \
             -d @body.json)
 
-          echo "HTTP: $STATUS"
+          echo "HTTP status: $STATUS"
           cat response.json
 
           if [ "$STATUS" != "200" ]; then
-            echo "ERROR: Page update failed"
+            echo "ERROR: page update failed"
             exit 1
           fi
 
-          echo "✅ Page updated with draw.io macro"
+          echo "✅ Diagram successfully rendered in Confluence"
