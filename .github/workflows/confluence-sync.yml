@@ -1,4 +1,4 @@
-name: Sync draw.io to Confluence (Stable Final)
+name: Sync draw.io to Confluence (Final Fixed)
 
 on:
   push:
@@ -32,7 +32,7 @@ jobs:
       # Fetch Confluence page
       - name: Fetch Confluence metadata
         env:
-          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}   # ZONDER /wiki
+          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}   # zonder /wiki
           PAGE_ID: ${{ secrets.PAGE_ID }}
           USER: ${{ secrets.CONFLUENCE_USER }}
           TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
@@ -60,10 +60,10 @@ jobs:
           echo "NEXT_VERSION=$NEXT_VERSION" >> $GITHUB_ENV
           echo "TITLE=$TITLE" >> $GITHUB_ENV
 
-      # Update Confluence page
+      # Update Confluence
       - name: Update Confluence
         env:
-          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}   # ZONDER /wiki
+          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}   # zonder /wiki
           PAGE_ID: ${{ secrets.PAGE_ID }}
           USER: ${{ secrets.CONFLUENCE_USER }}
           TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
@@ -74,20 +74,14 @@ jobs:
 
           XML=$(cat drawio.xml)
 
-          # ✅ BELANGRIJK: heredoc zonder YAML breken
-          MACRO=$(cat <<'EOF'
-<ac:structured-macro ac:name="drawio">
-  <ac:parameter ac:name="diagramName">Auto Diagram</ac:parameter>
-  <ac:parameter ac:name="contentType">application/xml</ac:parameter>
-  <ac:plain-text-body><![CDATA[
-EOF
-)
+          # ✅ Build macro veilig (geen heredoc)
+          MACRO="<ac:structured-macro ac:name=\"drawio\">"
+          MACRO="${MACRO}<ac:parameter ac:name=\"diagramName\">Auto Diagram</ac:parameter>"
+          MACRO="${MACRO}<ac:parameter ac:name=\"contentType\">application/xml</ac:parameter>"
+          MACRO="${MACRO}<ac:plain-text-body><![CDATA[${XML}]]></ac:plain-text-body>"
+          MACRO="${MACRO}</ac:structured-macro>"
 
-          MACRO="${MACRO}${XML}"
-
-          MACRO="${MACRO}</ac:plain-text-body></ac:structured-macro>"
-
-          # JSON veilig opbouwen met jq
+          # ✅ JSON via jq (no parse errors)
           jq -n \
             --arg id "$PAGE_ID" \
             --arg title "$TITLE" \
