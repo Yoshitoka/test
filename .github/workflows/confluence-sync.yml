@@ -1,4 +1,4 @@
-name: Sync draw.io to Confluence (Attachment Final Working)
+name: Sync draw.io to Confluence (Full Macro Version)
 
 on:
   push:
@@ -38,7 +38,7 @@ jobs:
       # =========================================
       - name: Fetch page info
         env:
-          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}   # zonder /wiki
+          BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
           PAGE_ID: ${{ secrets.PAGE_ID }}
           USER: ${{ secrets.CONFLUENCE_USER }}
           TOKEN: ${{ secrets.CONFLUENCE_API_TOKEN }}
@@ -71,20 +71,16 @@ jobs:
 
           URL="$BASE_URL/wiki/rest/api/content/$PAGE_ID/child/attachment"
 
-          echo "Uploading drawio.drawio..."
-
           curl -X POST "$URL" \
             -H "Authorization: Basic $AUTH" \
             -H "X-Atlassian-Token: nocheck" \
             -F 'file=@drawio.drawio;type=application/vnd.jgraph.mxfile' \
             -F 'minorEdit=true'
 
-          echo "✅ Upload complete"
-
       # =========================================
-      # GET ATTACHMENT ID
+      # GET ATTACHMENT INFO
       # =========================================
-      - name: Get attachment ID
+      - name: Get attachment info
         env:
           BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
           PAGE_ID: ${{ secrets.PAGE_ID }}
@@ -99,20 +95,12 @@ jobs:
 
           ATTACH_ID=$(jq -r '.results[0].id' attach.json)
 
-          if [ -z "$ATTACH_ID" ] || [ "$ATTACH_ID" = "null" ]; then
-            echo "ERROR: failed to get attachment ID"
-            cat attach.json
-            exit 1
-          fi
-
-          echo "Attachment ID: $ATTACH_ID"
-
           echo "ATTACH_ID=$ATTACH_ID" >> $GITHUB_ENV
 
       # =========================================
-      # UPDATE PAGE WITH DRAW.IO MACRO
+      # UPDATE PAGE WITH FULL MACRO
       # =========================================
-      - name: Update page with diagram
+      - name: Update page
         env:
           BASE_URL: ${{ secrets.CONFLUENCE_BASE }}
           PAGE_ID: ${{ secrets.PAGE_ID }}
@@ -124,13 +112,27 @@ jobs:
         run: |
           AUTH=$(echo -n "$USER:$TOKEN" | base64 -w 0)
 
-          # ✅ CORRECTE diagrams.net macro
-          MACRO="<ac:structured-macro ac:name=\"diagrams.net\">"
+          # ✅ Generate random IDs (zoals Confluence doet)
+          MACRO_ID=$(uuidgen)
+          LOCAL_ID=$(uuidgen)
+
+          MACRO="<ac:structured-macro ac:name=\"drawio\" ac:schema-version=\"1\" data-layout=\"default\" ac:local-id=\"$LOCAL_ID\" ac:macro-id=\"$MACRO_ID\">"
+          MACRO="<ac:parameter ac:name=\"mVer\">2</ac:parameter>"
+          MACRO="<ac:parameter ac:name=\"simple\">0</ac:parameter>"
+          MACRO="<ac:parameter ac:name=\"zoom\">1</ac:parameter>"
+          MACRO="<ac:parameter ac:name=\"inComment\">0</ac:parameter>"
+          MACRO="<ac:parameter ac:name=\"pageId\">$PAGE_ID</ac:parameter>"
+          MACRO="<ac:parameter ac:name=\"diagramDisplayName\">drawio.drawio</ac:parameter>"
+          MACRO="<ac:parameter ac:name=\"lbox\">1</ac:parameter>"
+          MACRO="<ac:parameter ac:name=\"contentVer\">1</ac:parameter>"
+          MACRO="<ac:parameter ac:name=\"revision\">1</ac:parameter>"
+          MACRO="<ac:parameter ac:name=\"baseUrl\">$BASE_URL/wiki</ac:parameter>"
           MACRO="<ac:parameter ac:name=\"diagramName\">drawio.drawio</ac:parameter>"
-          MACRO="<ac:parameter ac:name=\"attachmentId\">$ATTACH_ID</ac:parameter>"
+          MACRO="<ac:parameter ac:name=\"pCenter\">0</ac:parameter>"
+          MACRO="<ac:parameter ac:name=\"width\">800</ac:parameter>"
+          MACRO="<ac:parameter ac:name=\"height\">600</ac:parameter>"
           MACRO="</ac:structured-macro>"
 
-          # ✅ JSON veilig bouwen
           jq -n \
             --arg id "$PAGE_ID" \
             --arg title "$TITLE" \
@@ -161,8 +163,9 @@ jobs:
           cat response.json
 
           if [ "$STATUS" != "200" ]; then
-            echo "ERROR: page update failed"
+            echo "ERROR: update failed"
             exit 1
           fi
 
-          echo "✅ Diagram successfully rendered in Confluence"
+          echo "✅ Diagram succesvol gerenderd"
+``
