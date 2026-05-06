@@ -78,7 +78,7 @@ jobs:
 
           RESPONSE=$(curl -s \
             -H "Authorization: Basic $(echo -n "$USER:$TOKEN" | base64)" \
-            "$BASE_URL/rest/api/content/$PAGE_ID?expand=version,title")
+            "$BASE_URL/wiki/rest/api/content/$PAGE_ID?expand=version,title")
 
           echo "$RESPONSE" > page.json
 
